@@ -70,6 +70,10 @@ root.update()
 import tempfile
 pbload['value'] +=5
 root.update()
+import threading
+import queue
+pbload['value'] +=5
+root.update()
 
 loading.destroy()
 pbload.destroy()
@@ -91,9 +95,12 @@ def begin_fetch():
         cgrabonlyone = c.fetchall()
         if cgrabonlyone == []:
             temp_feedurl = feedE.get()
-            c.execute("""INSERT INTO podcasts VALUES('{}', '{}')""".format(feed_title, feedE.get()))
+            c.execute("""INSERT INTO podcasts VALUES('{}', '{}', '{}')""".format(feed_title, feedE.get(), 0))
             conn.commit()
-            Button(sideF, text=feed_title, command=lambda: (feedE.delete(0, END), feedE.insert(0, temp_feedurl), begin_fetch())).pack(fill='x', padx=3, pady=3)
+            insert_feedbutton([feed_title, temp_feedurl])
+        else:
+            c.execute("""UPDATE podcasts SET amount_used = amount_used + 1 WHERE name='{}' AND link='{}'""".format(feed_title, feedE.get()))
+            conn.commit()
 
         try:
             submain.destroy()
@@ -114,17 +121,19 @@ def begin_fetch():
                 hj.insert(0.0, summary)
                 Label(randoF, text=f"{idx}. {title}", font=('Calibri', 12, 'bold'), bootstyle='secondary inverse').pack(padx=10, pady=5, side='left')
                 
-                Button(randoF, text="Download", command=lambda idx=idx: (choice.set(idx), commencedownload())).pack(padx=10, pady=5, side='right')
+                
+                Button(randoF, text="Download", command=lambda idx=idx: (enqueue_download(idx), Label(randoF, text="Request Recieved.", font=('Calibri', 10), bootstyle='secondary inverse').pack(padx=10, pady=5, side='right'))).pack(padx=10, pady=5, side='right')
                 root.update()
 
         root.update()
     
-def commencedownload():
+def commencedownload(idx=None, from_queue=False):
     global choice, episodes, feed_title, cover_image
-    episode = episodes[choice.get() - 1]
+    if idx is None:
+        idx = choice.get()
+    episode = episodes[idx - 1]
     enclosures = episode.get("enclosures", [])
     media_url = None
-    
     for enc in enclosures:
         url = enc.get("url")
         mimetype = enc.get("type", "")
@@ -133,43 +142,51 @@ def commencedownload():
     if not media_url and enclosures:
         media_url = enclosures[0].get("url")
     if not media_url:
-        statusL.config(text="No valid media URL found for this episode.")
+        if not from_queue:
+            statusL.config(text="No valid media URL found for this episode.")
         return
-    
-    # Generate a more user-friendly filename based on the episode title
-    safe_title = re.sub(r'[^\w\-_\. ]', '_', episode.get('title', 'podcast'))[:50]  # Truncate long titles
+    safe_title = re.sub(r'[^\w\-_\. ]', '_', episode.get('title', 'podcast'))[:50]
     filename = f"{safe_title}.mp3"
-    
-    # Create a more descriptive output filename for easier identification
     if 'pubDate' in episode:
         try:
             date_str = episode['pubDate'][:10].replace('-', '').replace(' ', '')
             filename = f"{date_str}_{safe_title}.mp3"
         except:
             pass
-    
-    # Debug information
-    # print(f"\nDownloading episode: {episode.get('title', 'Unknown')}")
-    # print(f"Media URL: {media_url}")
-    # print(f"Output filename: {filename}")
-    
-    # Find episode-specific image if available
     episode_image = None
-    # Look for episode-specific image in various formats
     if 'itunes:image' in episode:
         episode_image = episode['itunes:image']
     elif 'image' in episode:
         episode_image = episode['image']
-        
-    # Try to use episode image first, fall back to podcast image
     image_to_use = episode_image if episode_image else cover_image
-    # print(f"Using image: {image_to_use}")
-        
     if download_file(media_url, filename):
         set_metadata(filename, episode, feed_title, image_to_use)
     else:
-        statusL.config(text="Download failed.")
+        if not from_queue:
+            statusL.config(text="Download failed.")
 
+def download_worker():
+    global download_worker_running, download_queue
+    while True:
+        item = download_queue.get()
+        if item is None:
+            break  # Sentinel to stop the worker
+        idx = item
+        try:
+            # Use root.after to update UI safely
+            root.after(0, lambda: choice.set(idx))
+            commencedownload(idx=idx, from_queue=True)
+        except Exception as e:
+            root.after(0, lambda: statusL.config(text=f"Download error: {e}"))
+        download_queue.task_done()
+    download_worker_running = False
+
+def enqueue_download(idx):
+    global download_worker_running, download_queue
+    download_queue.put(idx)
+    if not download_worker_running:
+        download_worker_running = True
+        threading.Thread(target=download_worker, daemon=True).start()
 
 def parse_feed(rss_feed_url, max_items=20):
     global feed_title, episodes, cover_image, podcast_description
@@ -409,23 +426,37 @@ def download_file(url, filename):
         statusL.config(text=f"Error downloading file: {e}")
         return False
 
+class insert_feedbutton:
+    def __init__(self, feedlink):
+        self.feedname = feedlink[0]
+        self.feed_link = feedlink[1] 
+        self.feedframe = Frame(sideF)
+        self.feedframe.pack(fill='x', pady=2)
+
+        # Make feedbutton expand and fill available space
+        self.feedbutton = Button(self.feedframe,text=self.feedname[0:21], command=lambda: (feedE.delete(0, END), feedE.insert(0, self.feed_link), begin_fetch()), width=20)
+        self.feedbutton.pack(side='left', fill='x', expand=True, padx=(0, 2))
+
+        # Make delete button as small as possible
+        self.deletefeed = Button(self.feedframe, text='🗑️', width=2, command=lambda: (self.feedframe.destroy(), c.execute("""DELETE from podcasts WHERE link='{}'""".format(self.feed_link)), conn.commit()), bootstyle='danger outline')
+        self.deletefeed.pack(side='right', padx=(2, 0))
+
 global conn, c
 conn = sql.connect('infopod.db')
 c = conn.cursor()
 
 c.execute("""CREATE TABLE IF NOT EXISTS podcasts (
     name TEXT,
-    link TEXT)""")
+    link TEXT,
+    amount_used INTEGER)""")
 
 
 # Shows list of rss feeds
 outerside = Frame(root)
 outerside.pack(fill='y', side='left')
 
-sideF = ScrolledFrame(outerside, width=200, autohide=True)
-sideF.pack(fill='both', expand=True)
-
-
+sideF = ScrolledFrame(outerside, autohide=True, width=200)
+sideF.pack(fill='y', expand=True)
 
 sideheaderL = Label(sideF, text='Feeds', font=('Calibri', 20, 'bold'))
 sideheaderL.pack(pady=15, padx=5)
@@ -434,7 +465,7 @@ c.execute('''SELECT * FROM podcasts''')
 links_grabber = c.fetchall()
 
 for feedlink in links_grabber:
-    Button(sideF, text=feedlink[0], command=lambda feedlink=feedlink: (feedE.delete(0, END), feedE.insert(0, feedlink[1]), begin_fetch())).pack(fill='x', padx=3, pady=3)
+    insert_feedbutton(feedlink)
 
 
 if links_grabber == []:
@@ -470,11 +501,13 @@ Button(feedE, text='Fetch Feed', command=lambda: begin_fetch()).pack(side='right
 suggestionsF = Frame(root, bootstyle='secondary')
 suggestionsF.pack(fill='x', padx=20, pady=10)
 
-Button(suggestionsF, text='The Mark Levin Show', command=lambda: (feedE.delete(0, END), feedE.insert(0, 'https://feeds.megaphone.fm/mark-levin-podcast'), begin_fetch())).grid(row=0, column=0, padx=3, pady=3)
-Button(suggestionsF, text='Joe Rogan Podcast', command=lambda: (feedE.delete(0, END), feedE.insert(0, 'https://feeds.megaphone.fm/GLT1412515089'), begin_fetch())).grid(row=0, column=1, padx=3, pady=3)
-Button(suggestionsF, text='LARRY', command=lambda: (feedE.delete(0, END), feedE.insert(0, 'https://www.omnycontent.com/d/playlist/5e27a451-e6e6-4c51-aa03-a7370003783c/744234dd-ebe9-465c-8f0d-b111012fc6d0/195549dc-0ff1-4325-8dfc-b111015d2739/podcast.rss'), begin_fetch())).grid(row=0, column=2, padx=3, pady=3)
-Button(suggestionsF, text='Unexplained Mysteries', command=lambda: (feedE.delete(0, END), feedE.insert(0, 'https://feeds.megaphone.fm/END9329892371'), begin_fetch())).grid(row=0, column=3, padx=3, pady=3)
 
+c.execute('''SELECT * FROM podcasts WHERE amount_used > 0 ORDER BY amount_used DESC LIMIT 5''')
+suggestions = c.fetchall()
+grid_column = 0
+for feeds in suggestions:
+    Button(suggestionsF, text=feeds[0], command=lambda feeds=feeds: (feedE.delete(0, END), feedE.insert(0, feeds[1]), begin_fetch())).grid(row=0, column=grid_column, padx=3, pady=3)
+    grid_column += 1
 
 # bottom bar
 bottomF = Frame(root)
@@ -492,5 +525,8 @@ mainF.pack(fill='both', expand=True)
 
 # Initialize submain as a global variable
 submain = None
+
+download_queue = queue.Queue()
+download_worker_running = False
 
 root.mainloop()

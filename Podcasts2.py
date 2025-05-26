@@ -53,8 +53,7 @@ from io import BytesIO
 pbload['value'] +=5
 root.update()
 Image.CUBIC = Image.BICUBIC
-pbload['value'] +=5
-root.update()
+
 from ttkbootstrap import *
 pbload['value'] +=5
 root.update()
@@ -71,6 +70,8 @@ import tempfile
 pbload['value'] +=5
 root.update()
 import threading
+pbload['value'] +=5
+root.update()
 import queue
 pbload['value'] +=5
 root.update()

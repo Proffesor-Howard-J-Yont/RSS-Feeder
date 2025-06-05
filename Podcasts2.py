@@ -38,7 +38,7 @@ root.update()
 from mutagen.mp3 import MP3
 pbload['value'] +=5
 root.update()
-from mutagen.id3 import ID3, APIC, PictureType, Encoding
+from mutagen.id3 import ID3, APIC, PictureType, Encoding, COMM, USLT
 pbload['value'] +=5
 root.update()
 import mutagen
@@ -88,7 +88,7 @@ cover_image_label = None
 cover_image_photo = None
 
 def begin_fetch():
-    global submain, feed_title, episodes, cover_image, episodeloaderSB, statusL, c, conn
+    global submain, feed_title, episodes, cover_image, podcast_description
     global cover_image_label, cover_image_photo
     try:
         loadertest = int(episodeloaderSB.get())
@@ -425,6 +425,12 @@ def set_metadata(filename, episode, feed_title, cover_image):
                     notification.send()
                     folder_path = os.path.dirname(os.path.abspath(filename))
                     subprocess.Popen(f'explorer "{folder_path}"')
+                    try:
+                        zoom_path = r"C:\Users\613ba\AppData\Roaming\Zoom\bin\Zoom.exe"
+                        subprocess.Popen([zoom_path])
+                        print(folder_path)
+                    except:
+                        statusL.config(text="Zoom not found, skipping Zoom launch")
                 else:
                     statusL.config(text="Warning: Cover art may not have been properly added")
                 
@@ -439,7 +445,14 @@ def set_metadata(filename, episode, feed_title, cover_image):
         statusL.config(text=f"Error setting metadata: {str(e)}")
         #print(f"Metadata error: {e}")
         root.update()
-
+    
+    # Add description to ID3v2.3 COMM frame
+    description = episode.get('summary') or episode.get('description')
+    if description:
+        id3 = ID3(filename)
+        id3.delall('USLT')  # Remove existing lyrics to avoid duplicates
+        id3.add(USLT(encoding=3, lang='eng', desc='', text=description))
+        id3.save(filename)
 
 def download_file(url, filename):
     """Download file in chunks with a progress indicator and save to filename."""

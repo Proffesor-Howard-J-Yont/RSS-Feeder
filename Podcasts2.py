@@ -23,6 +23,7 @@ import re
 pbload['value'] +=5
 root.update()
 import os
+import subprocess
 pbload['value'] +=5
 root.update()
 import sys
@@ -37,7 +38,7 @@ root.update()
 from mutagen.mp3 import MP3
 pbload['value'] +=5
 root.update()
-from mutagen.id3 import ID3, APIC, PictureType, Encoding
+from mutagen.id3 import ID3, APIC, PictureType, Encoding, COMM, USLT
 pbload['value'] +=5
 root.update()
 import mutagen
@@ -46,7 +47,7 @@ root.update()
 import tkinter as tk
 pbload['value'] +=5
 root.update()
-from PIL import Image
+from PIL import Image, ImageTk  # Already imported PIL.Image, add ImageTk for display
 pbload['value'] +=5
 root.update()
 from io import BytesIO
@@ -82,16 +83,57 @@ pbload.destroy()
 global choice
 choice=IntVar()
 
+# Add these globals after your other globals
+cover_image_label = None
+cover_image_photo = None
+
 def begin_fetch():
-    global submain, feed_title, episodes, cover_image, episodeloaderSB, statusL, c, conn
+    global submain, feed_title, episodes, cover_image, podcast_description
+    global cover_image_label, cover_image_photo
     try:
         loadertest = int(episodeloaderSB.get())
     except: 
         statusL.config(text='Please input an integer')
     else:
         feed_title, episodes, cover_image, podcast_description = parse_feed(feedE.get(), max_items=int(episodeloaderSB.get()))
+
+        # --- COVER ART DISPLAY LOGIC ---
+        # Remove previous cover image if it exists
+        if 'cover_image_label' in globals() and cover_image_label is not None:
+            cover_image_label.destroy()
+            cover_image_label = None
+            cover_image_photo = None
+
+        if cover_image:
+            try:
+                response = requests.get(cover_image, timeout=5)
+                response.raise_for_status()
+                img_data = response.content
+                img = Image.open(BytesIO(img_data))
+                img.thumbnail((80, 80), Image.LANCZOS)
+                cover_image_photo = ImageTk.PhotoImage(img)
+                cover_image_label = Label(topF, image=cover_image_photo)
+                cover_image_label.pack(side='left', padx=10, pady=5)
+                # Move headerL and subheaderL to the right of the image
+                headerL.pack_forget()
+                headerL.pack(side='left', padx=10)
+                subheaderL.pack_forget()
+                subheaderL.pack(side='left', padx=10)
+            except Exception as e:
+                # Fallback to normal packing if image fails
+                headerL.pack_forget()
+                headerL.pack()
+                subheaderL.pack_forget()
+                subheaderL.pack()
+        else:
+            # If no image, make sure headerL and subheaderL are packed normally
+            headerL.pack_forget()
+            headerL.pack()
+            subheaderL.pack_forget()
+            subheaderL.pack()
+
         headerL.config(text=feed_title)
-        subheaderL.config(text=podcast_description)
+        subheaderL.config(text=podcast_description[0:200] + '...' if len(podcast_description) > 200 else podcast_description)
         c.execute("""SELECT * FROM podcasts WHERE name='{}' AND link='{}'""".format(feed_title, feedE.get()))
         cgrabonlyone = c.fetchall()
         if cgrabonlyone == []:
@@ -381,6 +423,14 @@ def set_metadata(filename, episode, feed_title, cover_image):
                     notification.message = f'{episode.get('title', 'Unknown Title')} completed downloading and is saved as {os.path.basename(filename)}'
                     notification.icon = temp_image_path
                     notification.send()
+                    folder_path = os.path.dirname(os.path.abspath(filename))
+                    subprocess.Popen(f'explorer "{folder_path}"')
+                    try:
+                        zoom_path = r"C:\Users\613ba\AppData\Roaming\Zoom\bin\Zoom.exe"
+                        subprocess.Popen([zoom_path])
+                        print(folder_path)
+                    except:
+                        statusL.config(text="Zoom not found, skipping Zoom launch")
                 else:
                     statusL.config(text="Warning: Cover art may not have been properly added")
                 
@@ -395,7 +445,14 @@ def set_metadata(filename, episode, feed_title, cover_image):
         statusL.config(text=f"Error setting metadata: {str(e)}")
         #print(f"Metadata error: {e}")
         root.update()
-
+    
+    # Add description to ID3v2.3 COMM frame
+    description = episode.get('summary') or episode.get('description')
+    if description:
+        id3 = ID3(filename)
+        id3.delall('USLT')  # Remove existing lyrics to avoid duplicates
+        id3.add(USLT(encoding=3, lang='eng', desc='', text=description))
+        id3.save(filename)
 
 def download_file(url, filename):
     """Download file in chunks with a progress indicator and save to filename."""
@@ -489,8 +546,8 @@ topF.pack(fill='x', padx=20, pady=10)
 headerL = Label(topF, text='Enter RSS Feed', font=('Calibri', 30))
 headerL.pack()
 def updatewidth(event):
-    root.after(50, lambda: subheaderL.config(wraplength=root.winfo_width()-250))
-subheaderL = Label(topF, text='', font=('Calibri', 10), wraplength=400)
+    root.after(50, lambda: subheaderL.config(wraplength=root.winfo_width()-650))
+subheaderL = Label(topF, text='', font=('Calibri', 10), wraplength=500)
 subheaderL.pack()
 root.bind('<Configure>', updatewidth)
 feedE = Entry(topF, font=('Calibri', 16))

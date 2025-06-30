@@ -20,7 +20,13 @@ def download_and_convert():
         # Download audio using yt-dlp
         safe_title = sanitize_filename("youtube_audio")
         mp3_filename = f"{safe_title}.mp3"
-        subprocess.run(["yt-dlp", "-x", "--audio-format", "mp3", "-o", mp3_filename, url])
+        subprocess.run([
+            "yt-dlp",
+            "-x",
+            "--audio-format", "mp3",
+            "-o", f"{safe_title}.%(ext)s",
+            url
+        ])
 
         messagebox.showinfo("Success", f"MP3 saved as: {mp3_filename}")
 

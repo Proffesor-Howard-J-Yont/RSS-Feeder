@@ -523,17 +523,31 @@ def download_file(url, filename):
 class insert_feedbutton:
     def __init__(self, feedlink):
         self.feedname = feedlink[0]
-        self.feed_link = feedlink[1] 
+        self.feed_link = feedlink[1]
+        self.auto_check = feedlink[6] if len(feedlink) > 6 else 1  # Default to 1 if not present
         self.feedframe = Frame(sideF)
         self.feedframe.pack(fill='x', pady=2)
 
-        # Make feedbutton expand and fill available space
-        self.feedbutton = Button(self.feedframe,text=self.feedname[0:21], command=lambda: (feedE.delete(0, END), feedE.insert(0, self.feed_link), begin_fetch()), width=20)
+        self.feedbutton = Button(self.feedframe, text=self.feedname[0:21], command=lambda: (feedE.delete(0, END), feedE.insert(0, self.feed_link), begin_fetch()), width=20)
         self.feedbutton.pack(side='left', fill='x', expand=True, padx=(0, 2))
 
-        # Make delete button as small as possible
-        self.deletefeed = Button(self.feedframe, text='🗑️', width=2, command=lambda: (self.feedframe.destroy(), c.execute("""DELETE from podcasts WHERE link='{}'""".format(self.feed_link)), conn.commit()), bootstyle='danger outline')
-        self.deletefeed.pack(side='right', padx=(2, 0))
+        # Add the auto-check checkbox
+        self.auto_check_var = tk.IntVar(value=self.auto_check)
+        self.auto_check_cb = Checkbutton(
+            self.feedframe,
+            variable=self.auto_check_var,
+            bootstyle='success-tool',
+            command=self.toggle_auto_check,
+            width=2
+        )
+        self.auto_check_cb.pack(side='left')
+
+        self.deletefeed = Button(self.feedframe, text='Remove', command=lambda: (self.feedframe.destroy(), c.execute("""DELETE from podcasts WHERE link=?""", (self.feed_link,)), conn.commit()), bootstyle='danger outline')
+        self.deletefeed.pack(expand=True)
+
+    def toggle_auto_check(self):
+        c.execute("UPDATE podcasts SET auto_check=? WHERE link=?", (self.auto_check_var.get(), self.feed_link))
+        conn.commit()
 
 global conn, c
 conn = sql.connect('infopod.db')
@@ -566,7 +580,7 @@ except sql.OperationalError:
 outerside = Frame(root)
 outerside.pack(fill='y', side='left')
 
-sideF = ScrolledFrame(outerside, autohide=True, width=200)
+sideF = ScrolledFrame(outerside, autohide=True, width=250)
 sideF.pack(fill='y', expand=True)
 
 sideheaderL = Label(sideF, text='Feeds', font=('Calibri', 20, 'bold'))

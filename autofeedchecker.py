@@ -29,8 +29,8 @@ def main():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
 
-    c.execute("UPDATE podcasts SET last_seen_guid='None'")
-    conn.commit()
+    #c.execute("UPDATE podcasts SET last_seen_guid='None'")
+    #conn.commit()
 
     # Add a column to store last_seen_guid if not present
     try:

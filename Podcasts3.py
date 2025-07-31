@@ -537,17 +537,32 @@ class insert_feedbutton:
             self.feedframe,
             variable=self.auto_check_var,
             bootstyle='success-tool',
-            command=self.toggle_auto_check,
-            width=2
+            command=self.toggle_auto_check
         )
         self.auto_check_cb.pack(side='left')
 
-        self.deletefeed = Button(self.feedframe, text='Remove', command=lambda: (self.feedframe.destroy(), c.execute("""DELETE from podcasts WHERE link=?""", (self.feed_link,)), conn.commit()), bootstyle='danger outline')
+        # Add the auto-download checkbox
+        self.auto_download = feedlink[7] if len(feedlink) > 7 else 0  # Default to 0 if not present
+
+        self.auto_download_var = tk.IntVar(value=self.auto_download)
+        self.auto_download_cb = Checkbutton(
+            self.feedframe,
+            variable=self.auto_download_var,
+            bootstyle='warning-tool',
+            command=self.toggle_auto_download)
+        self.auto_download_cb.pack(side='left')
+
+        self.deletefeed = Button(self.feedframe, text='Del', command=lambda: (self.feedframe.destroy(), c.execute("""DELETE from podcasts WHERE link=?""", (self.feed_link,)), conn.commit()), bootstyle='danger outline')
         self.deletefeed.pack(expand=True)
 
     def toggle_auto_check(self):
         c.execute("UPDATE podcasts SET auto_check=? WHERE link=?", (self.auto_check_var.get(), self.feed_link))
         conn.commit()
+
+    def toggle_auto_download(self):
+        c.execute("UPDATE podcasts SET auto_download=? WHERE link=?", (self.auto_download_var.get(), self.feed_link))
+        conn.commit()
+        print(f"Auto-download for {self.feedname} set to {self.auto_download_var.get()}")
 
 global conn, c
 conn = sql.connect('infopod.db')
@@ -580,7 +595,7 @@ except sql.OperationalError:
 outerside = Frame(root)
 outerside.pack(fill='y', side='left')
 
-sideF = ScrolledFrame(outerside, autohide=True, width=250)
+sideF = ScrolledFrame(outerside, autohide=True, width=300)
 sideF.pack(fill='y', expand=True)
 
 sideheaderL = Label(sideF, text='Feeds', font=('Calibri', 20, 'bold'))
@@ -664,6 +679,10 @@ download_worker_running = False
 #all_feeds = c.fetchall()
 #for feed in all_feeds:
 #    print(f"Feed: {feed[0]}, Used: {feed[2]} times")
-
+#try:
+#    c.execute("ALTER TABLE podcasts ADD COLUMN auto_download INTEGER DEFAULT 0")
+#except sql.OperationalError:
+#    pass  # Column already exists
+#print("Database schema initialized and updated.")
 
 root.mainloop()

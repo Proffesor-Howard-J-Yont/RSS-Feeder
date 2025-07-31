@@ -1,12 +1,15 @@
-from ttkbootstrap import Window, Label, Progressbar
+from ttkbootstrap import Window, Label, Progressbar, Frame
 root = Window(themename='darkly')
 root.title('RSS Podcast Downloader')
 root.geometry('900x630')
 
-loading = Label(root, text='Loading...')
-loading.pack()
+loadframe = Frame(root)
+loadframe.place(relx=0.5, rely=0.4, anchor='center')
 
-pbload = Progressbar(root, bootstyle='danger striped', maximum=100, mode='determinate', value=0, length=300)
+loading = Label(loadframe, text='Loading', font=('Calibri', 20, 'bold'), bootstyle='secondary')
+loading.pack(pady=5)
+
+pbload = Progressbar(loadframe, bootstyle='danger striped', maximum=100, mode='determinate', value=0, length=300)
 pbload.pack()
 
 root.update()
@@ -455,14 +458,15 @@ def set_metadata(filename, episode, feed_title, cover_image):
                     notification.message = f'{episode.get('title', 'Unknown Title')} completed downloading and is saved as {os.path.basename(filename)}'
                     notification.icon = temp_image_path
                     notification.send()
-                    folder_path = os.path.dirname(os.path.abspath(filename))
-                    subprocess.Popen(f'explorer "{folder_path}"')
-                    try:
-                        zoom_path = r"C:\Users\613ba\AppData\Roaming\Zoom\bin\Zoom.exe"
-                        subprocess.Popen([zoom_path])
-                        print(folder_path)
-                    except:
-                        statusL.config(text="Zoom not found, skipping Zoom launch")
+                    if launch_toggle.get():
+                        folder_path = os.path.dirname(os.path.abspath(filename))
+                        subprocess.Popen(f'explorer "{folder_path}"')
+                        try:
+                            zoom_path = r"C:\Users\613ba\AppData\Roaming\Zoom\bin\Zoom.exe"
+                            subprocess.Popen([zoom_path])
+                            print(folder_path)
+                        except:
+                            statusL.config(text="Zoom not found, skipping Zoom launch")
                 else:
                     statusL.config(text="Warning: Cover art may not have been properly added")
                 
@@ -584,10 +588,16 @@ if links_grabber == []:
 sideheader2L = Label(outerside, text='Loading 20 episodes', font=('Calibri', 10, 'bold'))
 sideheader2L.pack(pady=5, padx=5)
 
+# Toggle button for launch Zoom and Explorer on download
+launch_toggle = BooleanVar(value=False)
+launch_toggle_button = Checkbutton(outerside, text='Launch apps on download', variable=launch_toggle, bootstyle='info')
+launch_toggle_button.pack(side='bottom', pady=5)
+
 global episodeloaderSB, pb
 episodeloaderSB = Spinbox(outerside, bootstyle='danger', from_=1, to=200, command=lambda: sideheader2L.config(text=f'Loading {episodeloaderSB.get()} episodes'))
 episodeloaderSB.pack(side='bottom', pady=5)
 episodeloaderSB.set(20)
+
 
 topF = Frame(root)
 topF.pack(fill='x', padx=20, pady=10)

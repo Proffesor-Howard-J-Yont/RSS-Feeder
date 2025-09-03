@@ -11,70 +11,70 @@ pbload.pack()
 
 root.update()
 import requests
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 import xml.etree.ElementTree as ET
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 import io
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 import re
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 import os
 import subprocess
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 import sys
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 import uuid
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 from mutagen.easyid3 import EasyID3
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 from mutagen.mp3 import MP3
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 from mutagen.id3 import ID3, APIC, PictureType, Encoding, COMM, USLT
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 import mutagen
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 import tkinter as tk
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 from PIL import Image, ImageTk  # Already imported PIL.Image, add ImageTk for display
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 from io import BytesIO
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 Image.CUBIC = Image.BICUBIC
 
 from ttkbootstrap import *
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 from ttkbootstrap.scrolled import ScrolledFrame, ScrolledText
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 import sqlite3 as sql
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 from notifypy import Notify
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 import tempfile
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 import threading
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 import queue
-pbload['value'] +=5
+pbload.set(pbload.get()+.01587)
 root.update()
 
 loading.destroy()

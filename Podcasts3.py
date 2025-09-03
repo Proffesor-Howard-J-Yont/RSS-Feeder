@@ -1,7 +1,7 @@
 from ttkbootstrap import Window, Label, Progressbar, Frame
 root = Window(themename='darkly')
 root.title('RSS Podcast Downloader')
-root.geometry('900x630')
+root.geometry('1300x800')
 
 loadframe = Frame(root)
 loadframe.place(relx=0.5, rely=0.4, anchor='center')
@@ -14,70 +14,70 @@ pbload.pack()
 
 root.update()
 import requests
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 import xml.etree.ElementTree as ET
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 import io
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 import re
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 import os
 import subprocess
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 import sys
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 import uuid
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 from mutagen.easyid3 import EasyID3
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 from mutagen.mp3 import MP3
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 from mutagen.id3 import ID3, APIC, PictureType, Encoding, COMM, USLT
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 import mutagen
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 import tkinter as tk
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 from PIL import Image, ImageTk  # Already imported PIL.Image, add ImageTk for display
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 from io import BytesIO
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 Image.CUBIC = Image.BICUBIC
 
 from ttkbootstrap import *
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 from ttkbootstrap.scrolled import ScrolledFrame, ScrolledText
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 import sqlite3 as sql
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 from notifypy import Notify
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 import tempfile
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 import threading
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 import queue
-pbload['value'] +=5
+pbload['value'] +=.5
 root.update()
 
 loading.destroy()
@@ -103,8 +103,7 @@ def update_podcast_metadata_background(feed_url, feed_title, podcast_description
                 thread_c.execute("""UPDATE podcasts SET feed_title=?, description=?, cover_image=?, amount_used = amount_used + 1 WHERE link=?""", 
                          (feed_title, podcast_description, cover_image, feed_url))
             else:
-                thread_c.execute("""INSERT INTO podcasts (name, link, amount_used, feed_title, description, cover_image) VALUES (?, ?, ?, ?, ?, ?)""",
-                          (feed_title, feed_url, 1, feed_title, podcast_description, cover_image))
+                thread_c.execute("""INSERT INTO podcasts VALUES (?, ?, ?, ?, ?, ?, 1, 0, 0)""", (feed_title, feed_url, 1, feed_title, podcast_description, cover_image))
                 root.after(0, lambda: insert_feedbutton([feed_title, feed_url]))
             thread_conn.commit()
             thread_conn.close()
@@ -267,7 +266,7 @@ def enqueue_download(idx):
         threading.Thread(target=download_worker, daemon=True).start()
 
 def parse_feed(rss_feed_url, max_items=20, metadata_only=True):
-    global feed_title, episodes, cover_image, podcast_description
+    global feed_title, episodes, cover_image, podcast_description, auto_check, auto_download
     try:
         response = requests.get(rss_feed_url, stream=True)
         response.raise_for_status()
@@ -458,11 +457,12 @@ def set_metadata(filename, episode, feed_title, cover_image):
                     notification.message = f'{episode.get('title', 'Unknown Title')} completed downloading and is saved as {os.path.basename(filename)}'
                     notification.icon = temp_image_path
                     notification.send()
-                    if launch_toggle.get():
+                    if launch_toggle_explorer.get():
                         folder_path = os.path.dirname(os.path.abspath(filename))
                         subprocess.Popen(f'explorer "{folder_path}"')
+                    if launch_toggle_zoom.get():
                         try:
-                            zoom_path = r"C:\Users\613ba\AppData\Roaming\Zoom\bin\Zoom.exe"
+                            zoom_path = r"C:\Users\dovid\AppData\Roaming\Zoom\bin\Zoom.exe"
                             subprocess.Popen([zoom_path])
                             print(folder_path)
                         except:
@@ -581,15 +581,23 @@ c.execute("""CREATE TABLE IF NOT EXISTS podcasts (
 try:
     c.execute("ALTER TABLE podcasts ADD COLUMN feed_title TEXT")
 except sql.OperationalError:
-    pass  # Column already exists
+    pass
 try:
     c.execute("ALTER TABLE podcasts ADD COLUMN description TEXT")
 except sql.OperationalError:
-    pass  # Column already exists
+    pass
 try:
     c.execute("ALTER TABLE podcasts ADD COLUMN cover_image TEXT")
 except sql.OperationalError:
-    pass  # Column already exists
+    pass
+try:
+    c.execute("ALTER TABLE podcasts ADD COLUMN auto_check INTEGER DEFAULT 1")
+except sql.OperationalError:
+    pass
+try:
+    c.execute("ALTER TABLE podcasts ADD COLUMN auto_download INTEGER DEFAULT 0")
+except sql.OperationalError:
+    pass
 
 # Shows list of rss feeds
 outerside = Frame(root)
@@ -618,10 +626,14 @@ sideheader2L = Label(outerside, text='Loading 20 episodes', font=('Calibri', 10,
 sideheader2L.pack(pady=5, padx=5)
 
 # Toggle button for launch Zoom and Explorer on download
-launch_toggle = BooleanVar(value=False)
-launch_toggle_button = Checkbutton(outerside, text='Launch apps on download', variable=launch_toggle, bootstyle='info')
-launch_toggle_button.pack(side='bottom', pady=5)
+launch_toggle_explorer = BooleanVar(value=False)
+launch_toggle_button_explorer = Checkbutton(outerside, text='Launch Explorer on download', variable=launch_toggle_explorer, bootstyle='info')
+launch_toggle_button_explorer.pack(side='bottom', pady=5)
 
+launch_toggle_zoom = BooleanVar(value=True)
+launch_toggle_button_zoom = Checkbutton(outerside, text='Launch Zoom on download', variable=launch_toggle_zoom, bootstyle='info')
+launch_toggle_button_zoom.pack(side='bottom', pady=5)
+# Spinbox to choose how many episodes to load
 global episodeloaderSB, pb
 episodeloaderSB = Spinbox(outerside, bootstyle='danger', from_=1, to=200, command=lambda: sideheader2L.config(text=f'Loading {episodeloaderSB.get()} episodes'))
 episodeloaderSB.pack(side='bottom', pady=5)
@@ -684,5 +696,9 @@ download_worker_running = False
 #except sql.OperationalError:
 #    pass  # Column already exists
 #print("Database schema initialized and updated.")
+
+#c.execute("PRAGMA table_info(podcasts)")
+#for col in c.fetchall():
+#    print(col)
 
 root.mainloop()

@@ -220,10 +220,10 @@ def home():
     suggested_podcasts = database_handler.get_suggested_podcasts()
     for index, podcast in enumerate(suggested_podcasts):
         podcast_name, podcast_description, podcast_image_data, podcast_feed, podcast_secret_key = podcast
-        print(f'Name: {podcast_name}')
-        print(f'Description: {podcast_description}')
-        print(f'Feed: {podcast_feed}')
-        print(f'Key: {podcast_secret_key}')
+        #print(f'Name: {podcast_name}')
+        #print(f'Description: {podcast_description}')
+        #print(f'Feed: {podcast_feed}')
+        #print(f'Key: {podcast_secret_key}')
         if podcast_image_data:
             try:
                 image = Image.open(io.BytesIO(podcast_image_data))
@@ -239,7 +239,33 @@ def home():
         podcast_button.grid(row=1, column=index+1, padx=20, pady=10)
 
 
-    # --------- Recent Podcast Bar -------------
+    # Show the rest of the podcasts in the database that are not in suggested or recent
+    other_podcasts = database_handler.get_other_podcasts()
+    if other_podcasts:
+        other_frame = CTkFrame(mainframe, corner_radius=20, height=150)
+        other_frame.pack(fill='x', pady=10)
+
+        otherL = CTkLabel(other_frame, text='More Podcasts', font=('Calibri', 30, 'bold'), justify='left')
+        otherL.grid(row=0, column=1, padx=20, pady=10)
+
+        for index, podcast in enumerate(other_podcasts):
+            podcast_name, podcast_description, podcast_image_data, podcast_feed, podcast_secret_key = podcast
+            if podcast_image_data:
+                try:
+                    image = Image.open(io.BytesIO(podcast_image_data))
+                    image = image.resize((120, 120))
+                    podcast_image = CTkImage(light_image=image, dark_image=image, size=(120, 120))
+                except Exception as e:
+                    print(f"Error loading podcast image: {e}")
+                    podcast_image = None
+            else:
+                podcast_image = None
+
+            podcast_button = CTkButton(other_frame, text=podcast_name, image=podcast_image, compound='top', width=150, height=150, fg_color='transparent', hover_color='gray25', font=('Calibri', 15, 'bold'), command=lambda podcast_secret_key=podcast_secret_key: display_podcast(podcast_secret_key))
+            # If more than 6 podcasts, move to next row
+            podcast_button.grid(row=1 + index // 6, column=1 + index % 6, padx=20, pady=10)
+    
+     # --------- Recent Podcast Bar -------------
     recent_frame = CTkFrame(mainframe, corner_radius=20, height=150)
     recent_frame.pack(fill='x', pady=10)
 
@@ -267,8 +293,8 @@ def home():
 def display_podcast(podcast_secret_key):
     clear_board()
     database_handler.increment_click_count(podcast_secret_key)
-    print('Hello!!')
-    print(podcast_secret_key)
+    #print('Hello!!')
+    #print(podcast_secret_key)
 
     pod_info = database_handler.grab_podcast(podcast_secret_key)
     if pod_info is None:
@@ -293,14 +319,158 @@ def display_podcast(podcast_secret_key):
             image = Image.open(io.BytesIO(podcast_image_data))
             image = image.resize((200, 200))
             podcast_image = CTkImage(light_image=image, dark_image=image, size=(200, 200))
-            CTkLabel(info_frame, image=podcast_image, text='').grid(row=0, column=0, padx=20, pady=20)
+            CTkLabel(info_frame, image=podcast_image, text='').grid(row=0, column=0, rowspan=2, padx=20, pady=20)
         except Exception as e:
             print(f"Error loading podcast image: {e}")
 
     CTkLabel(info_frame, text=podcast_name, font=('Calibri', 30, 'bold')).grid(row=0, column=1, padx=20, pady=20)
-    CTkLabel(info_frame, text=podcast_description, font=('Calibri', 15), wraplength=800, justify='left').grid(row=1, column=0, columnspan=2, padx=20)
+    CTkLabel(info_frame, text=podcast_description, font=('Calibri', 15), wraplength=800, justify='left').grid(row=1, column=1, padx=20)
+
+    # Episodes
+
+    CTkLabel(mainframe, text='Latest', font=('Calibri', 30, 'bold')).pack(pady=50)
+
+    # Fetch and display episodes from the feed
+    pod_feed = pod_info[4]
+
+    try:
+        response = requests.get(pod_feed)
+        if response.status_code == 200:
+            channel = ET.fromstring(response.content)
+            items = channel.findall("./channel/item")
+            
+            for idx, item in enumerate(items):
+                if idx >= 20:
+                    break
+                display_episode(item, podcast_name)
+    except Exception as e:
+        print(f"Error fetching feed: {e}")
+        CTkLabel(mainframe, text='Failed to fetch episodes.', font=('Calibri', 20), text_color='red').pack(pady=10)
+
+class display_episode:
+    def __init__(self, item, podcast_name):
+        episode_title = item.find("title").text if item.find("title") is not None else "No Title"
+        episode_description = item.find("description").text if item.find("description") is not None else "No Description"
+        episode_pubDate = item.find("pubDate").text if item.find("pubDate") is not None else "No Publication Date"
+        episode_enclosure = item.find("enclosure")
+        episode_audio_url = episode_enclosure.get('url') if episode_enclosure is not None else None
+        episode_image = item.find("{http://www.itunes.com/dtds/podcast-1.0.dtd}image")
+        episode_image_url = episode_image.get('href') if episode_image is not None else None
 
 
+        self.episode_frame = CTkFrame(mainframe, corner_radius=10)
+        self.episode_frame.pack(fill='both', pady=10, padx=10)
+
+        # Episode Image
+        if episode_image_url:
+            try:
+                image_response = requests.get(episode_image_url)
+                image_data = image_response.content
+                image = Image.open(BytesIO(image_data))
+                image = image.resize((150, 150))
+                episode_image_ctk = CTkImage(light_image=image, dark_image=image, size=(150, 150))
+                CTkLabel(self.episode_frame, image=episode_image_ctk, text='').grid(row=0, column=0, rowspan=3, padx=10, pady=10)
+            except Exception as e:
+                print(f"Error loading episode image: {e}")
+                
+                print(f"Error loading podcast image as fallback: {e}")
+
+        CTkLabel(self.episode_frame, text=episode_title, font=('Calibri', 20, 'bold')).grid(row=0, column=1, sticky='w', padx=10, pady=5)
+        CTkLabel(self.episode_frame, text=episode_pubDate, font=('Calibri', 12, 'italic')).grid(row=1, column=1, sticky='w', padx=10)
+        CTkLabel(self.episode_frame, text=episode_description, font=('Calibri', 15), wraplength=700, justify='left').grid(row=2, column=1, sticky='w', padx=10, pady=5)
+        if episode_audio_url:
+             download_button = CTkButton(self.episode_frame, text='Download Episode', font=('Calibri', 15), width=150, command=lambda url=episode_audio_url: self.download_episode(url, podcast_name, episode_title, episode_image_url))
+             download_button.grid(row=0, column=2, padx=10, pady=10)                  
+
+        else:
+            CTkLabel(mainframe, text='Failed to fetch episodes.', font=('Calibri', 20), text_color='red').pack(pady=10)
+    
+    def download_episode(self, url, podcast_name, episode_title, episode_image_url):
+        def sanitize_filename(name):
+            return re.sub(r'[\\/*?:"<>|]', "", name)
+
+        def download_thread(url, podcast_name, episode_title, episode_image_url, progress_queue):
+            try:
+                response = requests.get(url, stream=True)
+                response.raise_for_status()
+
+                total_length = int(response.headers.get('content-length', 0))
+                progress_bar = CTkProgressBar(self.episode_frame, width=400)
+                progress_bar.grid(row=4, column=0, columnspan=4, sticky='we')
+                progress_bar.set(0)
+                downloaded = 0
+
+                total_size = int(response.headers.get('content-length', 0))
+                block_size = 1024
+                downloaded_size = 0
+
+                sanitized_podcast_name = sanitize_filename(podcast_name)
+                sanitized_episode_title = sanitize_filename(episode_title)
+
+                podcast_dir = os.path.join(os.getcwd(), 'Podcasts', sanitized_podcast_name)
+                os.makedirs(podcast_dir, exist_ok=True)
+
+                file_path = os.path.join(podcast_dir, f"{sanitized_episode_title}.mp3")
+
+                with open(file_path, 'wb') as file:
+                    for chunk in response.iter_content(chunk_size=4096):
+                        if chunk:
+                            file.write(chunk)
+                            downloaded += len(chunk)
+                            progress = downloaded / total_length if total_length else 0
+                            progress_bar.set(progress)
+                            root.update()
+                progress_bar.set(1)
+                # Add metadata
+                try:
+                    audio = MP3(file_path, ID3=ID3)
+                    try:
+                        audio.add_tags()
+                    except mutagen.id3.error:
+                        pass
+                    # Use EasyID3 for simple tags
+                    try:
+                        easy_tags = EasyID3(file_path)
+                    except mutagen.id3.ID3NoHeaderError:
+                        easy_tags = mutagen.File(file_path, easy=True)
+                        easy_tags.add_tags()
+                    easy_tags["title"] = episode_title
+                    easy_tags["artist"] = podcast_name
+                    easy_tags.save()
+                    # Add cover image using ID3 APIC frame
+                    if episode_image_url:
+                        try:
+                            image_response = requests.get(episode_image_url)
+                            image_data = image_response.content
+                            audio.tags.add(
+                                APIC(
+                                    encoding=3,
+                                    mime='image/jpeg',
+                                    type=3,
+                                    desc='Cover',
+                                    data=image_data
+                                )
+                            )
+                        except Exception as e:
+                            print(f"Error fetching episode image for metadata: {e}")
+                    audio.save()
+                except Exception as e:
+                    print(f"Error adding metadata: {e}")
+
+                notification = Notify()
+                notification.title = "Download Complete"
+                notification.message = f"{episode_title} has been downloaded."
+                notification.send()
+
+            except Exception as e:
+                print(f"Error downloading episode: {e}")
+            finally:
+                progress_queue.put(None)
+        
+        download_thread(url, podcast_name, episode_title, episode_image_url, queue.Queue())
+                
+        
+        
 # --- Main Application ---
 root_color = root.cget("fg_color")
 mainframe = CTkScrollableFrame(root, fg_color=root_color)

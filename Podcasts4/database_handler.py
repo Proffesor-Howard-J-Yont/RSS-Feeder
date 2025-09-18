@@ -43,7 +43,12 @@ def increment_click_count(secret_key):
     conn.commit()
 def grab_podcast(secret_key):
     c.execute("SELECT * FROM pod_list WHERE secret_key = ?", (secret_key,))
-    if c.fetchone() is None:
+    grabbed = c.fetchone()
+    if grabbed is None:
         print("Podcast not found in the database.")
         return None
-    return c.fetchone()
+    return grabbed
+
+def get_other_podcasts(): # Get all podcasts except the top 5 suggested
+    c.execute("SELECT name, description, image, feed, secret_key FROM pod_list WHERE secret_key NOT IN (SELECT secret_key FROM pod_list ORDER BY amt_clicked DESC LIMIT 5)")
+    return c.fetchall()
